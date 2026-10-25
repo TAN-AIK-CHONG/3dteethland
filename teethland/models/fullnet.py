@@ -173,31 +173,7 @@ class FullNet(pl.LightningModule):
         instances = x.new_tensor(features=instances)
         instances = self.trainer.datamodule.process_instances(instances)
 
-        # process point-level landmarks
-        landmarks_list = []
-        for i, offsets in enumerate(points_offsets):
-            kpt_mask = offsets.F[:, 0] < 0.15  # 2.5 mm
-            coords = proposals.C + offsets.F[:, 1:]
-            dists = torch.clip(offsets.F[:, 0], 0, 0.15)
-            weights = (0.15 - dists) / 0.15
-            landmarks = PointTensor(
-                coordinates=coords[kpt_mask],
-                features=weights[kpt_mask],
-                batch_counts=torch.bincount(
-                    input=proposals.batch_indices[kpt_mask],
-                    minlength=proposals.batch_size,
-                ),
-            )
-            landmarks = landmarks.cluster(**self.dbscan_cfg)
-            landmarks = landmarks.new_tensor(features=torch.column_stack((landmarks.F, 
-                torch.full((landmarks.C.shape[0],), i).to(coords.device),
-            )))
-            landmarks_list.append(landmarks)
-        landmarks = teethland.cat(landmarks_list)
-
-        landmarks = self.trainer.datamodule.process_landmarks(labels, landmarks)
-
-        return instances, landmarks
+        return instances, None
 
     def forward(
         self,
