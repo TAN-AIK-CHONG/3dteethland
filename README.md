@@ -42,6 +42,10 @@ pip install -e -v .
 
 ### 1. Inference
 
+Please specify the root directory where your scans are stored using the root keyword in teethland/config/config.yaml. The file names of the scans are expected to contain whether they are of the lower or upper jaw as STEM_(lower|upper).(stl|ply|obj). Please rename the scans using this format to get the correct FDI labels.
+
+Then, download the checkpoints (trained on 3DTeethSeg'22 train split) from [here](https://github.com/TAN-AIK-CHONG/3dteethland/releases/tag/v1.0) and specify their paths using the checkpoint_path keywords in teethland/config/config.yaml.
+
 ``` bash
 python infer.py landmarks --config teethland/config/config_bench.yaml
 ```
