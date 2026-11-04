@@ -7,11 +7,13 @@ import torch
 import yaml
 
 from teethland.datamodules import (
+    TeethBinSegDataModule,
     TeethInstSegDataModule,
     TeethLandDataModule,
     TeethMixedSegDataModule,
 )
 from teethland.models import (
+    BinSegNet,
     DentalNet,
     LandmarkNet,
     OffsetLandmarkNet,
@@ -30,6 +32,8 @@ def main(stage: str, devices: int, checkpoint: str):
         dm = TeethInstSegDataModule(seed=config['seed'], **config['datamodule'])
     elif stage == 'mixedseg':
         dm = TeethMixedSegDataModule(seed=config['seed'], **config['datamodule'])
+    elif stage == 'binseg':
+        dm = TeethBinSegDataModule(seed=config['seed'], **config['datamodule'])
     elif stage == 'landmarks':
         dm = TeethLandDataModule(seed=config['seed'], **config['datamodule'])
 
@@ -59,6 +63,11 @@ def main(stage: str, devices: int, checkpoint: str):
         
         instseg_state = {k: v for k, v in instseg_state['state_dict'].items() if k not in pop_keys}
         model.load_state_dict(instseg_state, strict=False)
+    elif stage == 'binseg':
+        model = BinSegNet(
+            in_channels=dm.num_channels,
+            **config['model'][stage],
+        )
     elif stage == 'landmarks':
         # model = LandmarkNet.load_from_checkpoint(
         model = OffsetLandmarkNet.load_from_checkpoint(
@@ -74,7 +83,7 @@ def main(stage: str, devices: int, checkpoint: str):
     logger = TensorBoardLogger(
         save_dir=config['work_dir'],
         name='',
-        version=config['version'],
+        version=f"{config['version']}_{stage}",
         default_hp_metric=False,
     )
     logger.log_hyperparams(config)
@@ -92,7 +101,7 @@ def main(stage: str, devices: int, checkpoint: str):
     )
     metric_checkpoint_callback = ModelCheckpoint(
         save_top_k=3,
-        monitor='dice/val' if stage == 'landmarks' else 'fdi_f1/val',
+        monitor='dice/val' if stage in ['binseg', 'landmarks'] else 'fdi_f1/val',
         mode='min' if stage == 'landmarks' else 'max',
         filename='weights-{epoch:02d}',
     )
@@ -119,7 +128,7 @@ def main(stage: str, devices: int, checkpoint: str):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('stage', choices=['instseg', 'mixedseg', 'landmarks'])
+    parser.add_argument('stage', choices=['instseg', 'mixedseg', 'binseg', 'landmarks'])
     parser.add_argument('--devices', required=False, default=1, type=int)
     parser.add_argument('--checkpoint', required=False, default=None)
     args = parser.parse_args()
