@@ -50,7 +50,7 @@ class FullNet(pl.LightningModule):
             out_channels=[1, 4, 4, 4, 4, 4],
             **landmarks,
         )
-        self.load_ckpt(self.landmarks_model, ckpt)
+        self.load_ckpt(self.landmarks_model, ckpt, segmentation_only=True)
 
         self.gen_proposals = T.GenerateProposals(proposal_points, max_proposals=32)
         self.dbscan_cfg = dbscan_cfg
@@ -61,13 +61,17 @@ class FullNet(pl.LightningModule):
             v: k for k, v in TeethLandDataset.landmark_classes.items()
         }
 
-    def load_ckpt(self, model, ckpt: str):
+    def load_ckpt(self, model, ckpt: str, segmentation_only: bool=False):
         state_dict = model.state_dict()
         if ckpt:
             ckpt = torch.load(ckpt)['state_dict']
             ckpt = {k.split('.', 1)[1]: v for k, v in ckpt.items()}
             ckpt = {k: v for k, v in ckpt.items() if k in state_dict}
-            model.load_state_dict(ckpt)
+
+            missing = model.load_state_dict(ckpt, strict=not segmentation_only).missing_keys
+            unused_heads = ('heads.0.', 'upsample_blocks.0.')
+            if any(not k.startswith(('heads.', 'upsample_blocks.')) or k.startswith(unused_heads) for k in missing):
+                raise RuntimeError(f'checkpoint is missing backbone or segmentation weights: {missing[:5]}')
             model.requires_grad_(False)
 
     def instances_stage(
